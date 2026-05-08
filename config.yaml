@@ -1,0 +1,72 @@
+project_name: "equatorial_revisit_study"
+
+# Path Configuration
+paths:
+  orekit_data: "./data/orekit-data-main.zip"
+  tle_source:  "./data/constellation_v1.tle"
+  output_dir:  "./outputs/experiment_j3/"
+
+# ── J3 propagation run (run.py) ───────────────────────────────────────────────
+orbit:
+  epoch:             "2025-06-01T00:00:00"
+  sma_m:             6778136.0   # semi-major axis [m]  (~400 km altitude)
+  eccentricity:      0.001
+  inclination_deg:   51.6
+  raan_deg:          45.0
+  aop_deg:           0.0
+  mean_anomaly_deg:  0.0
+
+simulation:
+  propagator:    "J3"     # Options: SGP4, J2, J3, Numerical
+  n_orbits:      5
+  step_size_s:   30.0     # output step [s]
+  pos_tol_m:     1.0      # integrator position tolerance [m]
+  min_step_s:    0.001
+  max_step_s:    300.0
+
+# ── Orbit design (design_neqfro.py) ──────────────────────────────────────────
+neqfro:
+  # Orbit type selector
+  #   near_equatorial  : inclination is a fixed input; SMA solved from repeat.
+  #   sun_synchronous  : inclination derived from sun-sync condition given SMA;
+  #                      inclination_deg is ignored.
+  #   custom           : both SMA (sma_m) and inclination_deg supplied directly.
+  orbit_type: "near_equatorial"
+
+  # Target orbit geometry
+  # inclination_deg is used for near_equatorial and custom only.
+  inclination_deg:   10.0
+  raan_deg:          0.0
+  aop_deg:           90.0     # frozen condition: 90 deg or 270 deg
+  mean_anomaly_deg:  0.0
+  epoch:             "2021-01-01T00:00:00"
+
+  # Ground-track repeat cycle
+  repeat_k:          44
+  repeat_q_days:     3.0
+
+  # High-precision propagator
+  gravity_degree:    70
+  gravity_order:     70
+  third_body:        true
+
+  # Propagation output
+  step_size_s:       30.0
+  pos_tol_m:         1.0
+  min_step_s:        0.001
+  max_step_s:        300.0
+
+  # Optimisation
+  run_broyden:       true    # SMA numerical refinement (slow; ~15 propagations)
+  broyden_max_iter:  15
+  run_rosengren:     false     # eccentricity frozen-state optimisation
+  rosengren_n_cycles: 5       # repeat cycles per Rosengren iteration (rotating frame; 3-5 is sufficient)
+  rosengren_n_iter:   50      # max Rosengren iterations (needs ~37-50 to converge to tol=1e-9)
+
+  output_dir: "./outputs/neqfro/"
+
+# ── Optimisation Targets ──────────────────────────────────────────────────────
+constraints:
+  lat_min:       -10
+  lat_max:        10
+  min_elevation:  15          # degrees
