@@ -25,14 +25,16 @@ def build_orbit(a, e, inc, raan, aop, m0, epoch, gcrf, mu):
 
 
 def build_propagator(orbit, itrf, pos_tol=1.0, min_step=0.001, max_step=300.0,
-                     gravity_degree=3):
-    """Build a zonal-only NumericalPropagator with a Dormand-Prince 8(5,3) integrator.
+                     gravity_degree=3, gravity_order=0, third_body=False):
+    """Build a NumericalPropagator with a Dormand-Prince 8(5,3) integrator.
 
     Parameters
     ----------
-    gravity_degree : int  Maximum zonal degree (order=0).  2 → J2 only, 3 → J2+J3.
+    gravity_degree : int   Maximum zonal degree.  2 → J2 only, 3 → J2+J3, 70 → EGM96.
+    gravity_order  : int   Maximum order (tesseral terms).  0 → zonal only.
+    third_body     : bool  If True, add Sun and Moon point-mass perturbations.
     """
-    gravity_provider = GravityFieldFactory.getNormalizedProvider(gravity_degree, 0)
+    gravity_provider = GravityFieldFactory.getNormalizedProvider(gravity_degree, gravity_order)
     gravity_model    = HolmesFeatherstoneAttractionModel(itrf, gravity_provider)
 
     tols = NumericalPropagator.tolerances(pos_tol, orbit, OrbitType.CARTESIAN)
@@ -45,6 +47,13 @@ def build_propagator(orbit, itrf, pos_tol=1.0, min_step=0.001, max_step=300.0,
     propagator = NumericalPropagator(integrator)
     propagator.setOrbitType(OrbitType.CARTESIAN)
     propagator.addForceModel(gravity_model)
+
+    if third_body:
+        from org.orekit.forces.gravity import ThirdBodyAttraction
+        from org.orekit.bodies import CelestialBodyFactory
+        propagator.addForceModel(ThirdBodyAttraction(CelestialBodyFactory.getSun()))
+        propagator.addForceModel(ThirdBodyAttraction(CelestialBodyFactory.getMoon()))
+
     propagator.setInitialState(SpacecraftState(orbit))
     return propagator
 

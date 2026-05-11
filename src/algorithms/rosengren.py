@@ -30,38 +30,40 @@ def eccentricity_timeseries(propagator, epoch, t_end, dt):
 
     Used for phase-space visualisation (inertial trajectory shows the circle).
     """
-    from org.orekit.propagation.sampling import PythonOrekitFixedStepHandler
+    from jpype import JImplements, JOverride
+    from org.orekit.propagation.sampling import OrekitFixedStepHandler
     from org.orekit.orbits import KeplerianOrbit
 
-    class _Handler(PythonOrekitFixedStepHandler):
-        def __init__(self):
-            super().__init__()
-            self._t0     = None
-            self.t_list  = []
-            self.ex_list = []
-            self.ey_list = []
+    t_list  = []
+    ex_list = []
+    ey_list = []
+    t0_box  = [None]
 
+    @JImplements(OrekitFixedStepHandler)
+    class _Handler:
+        @JOverride
         def init(self, s0, _t, _step):
-            self._t0 = s0.getDate()
+            t0_box[0] = s0.getDate()
 
+        @JOverride
         def handleStep(self, state):
             kep   = KeplerianOrbit(state.getOrbit())
             e     = float(kep.getE())
             omega = float(kep.getPerigeeArgument())
-            self.t_list.append(float(state.getDate().durationFrom(self._t0)))
-            self.ex_list.append(e * np.cos(omega))
-            self.ey_list.append(e * np.sin(omega))
+            t_list.append(float(state.getDate().durationFrom(t0_box[0])))
+            ex_list.append(e * np.cos(omega))
+            ey_list.append(e * np.sin(omega))
 
+        @JOverride
         def finish(self, _):
             pass
 
-    handler = _Handler()
-    propagator.getMultiplexer().add(float(dt), handler)
+    propagator.getMultiplexer().add(float(dt), _Handler())
     propagator.propagate(epoch.shiftedBy(float(t_end)))
 
-    return (np.array(handler.t_list),
-            np.array(handler.ex_list),
-            np.array(handler.ey_list))
+    return (np.array(t_list),
+            np.array(ex_list),
+            np.array(ey_list))
 
 
 def eccentricity_timeseries_rotating(propagator, epoch, t_end, dt, omega_dot):
@@ -74,41 +76,42 @@ def eccentricity_timeseries_rotating(propagator, epoch, t_end, dt, omega_dot):
     The frozen orbit's eccentricity vector is stationary at (0, e_f) in this
     frame, so its time-average equals (0, e_f) for any averaging window.
     """
-    from org.orekit.propagation.sampling import PythonOrekitFixedStepHandler
+    from jpype import JImplements, JOverride
+    from org.orekit.propagation.sampling import OrekitFixedStepHandler
     from org.orekit.orbits import KeplerianOrbit
 
-    _odot = float(omega_dot)
+    _odot   = float(omega_dot)
+    t_list  = []
+    ex_list = []
+    ey_list = []
+    t0_box  = [None]
 
-    class _Handler(PythonOrekitFixedStepHandler):
-        def __init__(self):
-            super().__init__()
-            self._t0     = None
-            self.t_list  = []
-            self.ex_list = []
-            self.ey_list = []
-
+    @JImplements(OrekitFixedStepHandler)
+    class _Handler:
+        @JOverride
         def init(self, s0, _t, _step):
-            self._t0 = s0.getDate()
+            t0_box[0] = s0.getDate()
 
+        @JOverride
         def handleStep(self, state):
-            t     = float(state.getDate().durationFrom(self._t0))
+            t     = float(state.getDate().durationFrom(t0_box[0]))
             kep   = KeplerianOrbit(state.getOrbit())
             e     = float(kep.getE())
             omega = float(kep.getPerigeeArgument()) - _odot * t
-            self.t_list.append(t)
-            self.ex_list.append(e * np.cos(omega))
-            self.ey_list.append(e * np.sin(omega))
+            t_list.append(t)
+            ex_list.append(e * np.cos(omega))
+            ey_list.append(e * np.sin(omega))
 
+        @JOverride
         def finish(self, _):
             pass
 
-    handler = _Handler()
-    propagator.getMultiplexer().add(float(dt), handler)
+    propagator.getMultiplexer().add(float(dt), _Handler())
     propagator.propagate(epoch.shiftedBy(float(t_end)))
 
-    return (np.array(handler.t_list),
-            np.array(handler.ex_list),
-            np.array(handler.ey_list))
+    return (np.array(t_list),
+            np.array(ex_list),
+            np.array(ey_list))
 
 
 def find_frozen_eccentricity(
